@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Procesní analýza investičních akcí</title>
+<meta name="description" content="Procesní analýza: stav AS-IS, cílový stav TO-BE, fáze stage-gate a měřítka úspěchu trackeru investičních akcí.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f3f6f8; --surface: #ffffff; --surface-2: #e9eff3; --ink: #11232e; --muted: #52656f;
+  --line: #d3dde3; --accent: #0b5c7a; --accent-ink: #ffffff; --accent-soft: #dcecf3;
+  --ok: #1b7a4b; --ok-soft: #dff1e7; --warn: #964b00; --warn-soft: #fdebd3;
+  --bad: #b3261e; --bad-soft: #fbe1de; --shadow: 0 1px 2px rgba(17,35,46,.08), 0 4px 14px rgba(17,35,46,.06);
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-text: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Consolas", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1a22; --surface: #12262f; --surface-2: #193440; --ink: #e6eff3; --muted: #9db2bc;
+    --line: #28414d; --accent: #5cc0e6; --accent-ink: #06222d; --accent-soft: #17414f;
+    --ok: #5fd09a; --ok-soft: #12382a; --warn: #f0a54a; --warn-soft: #3d2a10;
+    --bad: #ff8a80; --bad-soft: #43201d; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1a22; --surface: #12262f; --surface-2: #193440; --ink: #e6eff3; --muted: #9db2bc;
+  --line: #28414d; --accent: #5cc0e6; --accent-ink: #06222d; --accent-soft: #17414f;
+  --ok: #5fd09a; --ok-soft: #12382a; --warn: #f0a54a; --warn-soft: #3d2a10;
+  --bad: #ff8a80; --bad-soft: #43201d; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1.05rem/1.6 var(--font-text); }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; margin: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 0 1rem; }
+header.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; flex-wrap: wrap; gap: .6rem 1rem; align-items: center; justify-content: space-between; padding-top: .8rem; padding-bottom: .8rem; }
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .85rem; min-height: 2.5rem; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.nav { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
+main { padding: 1.5rem 0 2.5rem; }
+h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); letter-spacing: -.01em; }
+.lead { color: var(--muted); max-width: 42rem; margin: .5rem 0 0; }
+section { margin-top: 2.2rem; }
+h2 { font-size: 1.45rem; margin-bottom: .7rem; }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.2rem; box-shadow: var(--shadow); min-width: 0; }
+.card h3 { font-size: 1.1rem; margin-bottom: .5rem; }
+.card.asis { border-top: 4px solid var(--bad); } .card.tobe { border-top: 4px solid var(--ok); }
+.card ul { margin: 0; padding-left: 1.2rem; display: grid; gap: .45rem; }
+.tag { font-family: var(--font-mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; box-shadow: var(--shadow); overflow-x: auto; }
+.diagram svg { display: block; min-width: 760px; width: 100%; height: auto; }
+.svg-box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.svg-box.end { fill: var(--ok-soft); stroke: var(--ok); }
+.svg-gate { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.5; }
+.svg-line { stroke: var(--muted); stroke-width: 1.5; fill: none; }
+.svg-ret { stroke: var(--bad); stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+.svg-arrow { fill: var(--muted); }
+.svg-arrow-ret { fill: var(--bad); }
+.svg-t { fill: var(--ink); font: 600 12.5px var(--font-text); text-anchor: middle; }
+.svg-s { fill: var(--muted); font: 400 11px var(--font-mono); text-anchor: middle; }
+.svg-r { fill: var(--bad); font: 600 11px var(--font-text); text-anchor: middle; }
+.note { color: var(--muted); font-size: .95rem; margin-top: .6rem; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; font-size: .96rem; }
+th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+footer { border-top: 1px solid var(--line); padding: 1rem 0 1.6rem; color: var(--muted); font-size: .9rem; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <nav class="nav" aria-label="Navigace"><a href="index.html" data-testid="link-app">Zpět do aplikace</a></nav>
+    <button class="btn" type="button" id="theme-toggle" aria-label="Přepnout světlý a tmavý motiv">Motiv</button>
+  </div>
+</header>
+<main class="wrap">
+  <p class="tag">Procesní analýza</p>
+  <h1 data-testid="proces-title">Od e-mailů a Excelů k jednomu přehledu</h1>
+  <p class="lead">Jak běží příprava a realizace investiční akce dnes (AS-IS), jak ji sjednocuje Tracker investičních akcí (TO-BE) a podle čeho poznáme, že to funguje.</p>
+
+  <section aria-labelledby="h-asis">
+    <h2 id="h-asis">Stav AS-IS a cílový stav TO-BE</h2>
+    <div class="cols">
+      <div class="card asis">
+        <h3>Jak to běží dnes (AS-IS)</h3>
+        <ul>
+          <li><strong>E-maily a Excely.</strong> Stav akce žije v několika tabulkách a v poště jednotlivých lidí. Každý má jinou verzi.</li>
+          <li><strong>Nejasné, kdo schvaluje.</strong> Schvalovatel a podmínky schválení se zjišťují až při předání dalšímu oddělení.</li>
+          <li><strong>Chybějící dokumenty se zjistí pozdě.</strong> Chybí kolaudační souhlas, smlouva nebo dokumentace skutečného provedení, a akce se vrací o několik fází zpět.</li>
+          <li><strong>Nikdo nevidí, kde akce stojí.</strong> Že akce visí ve výběrovém řízení dvakrát déle, než je obvyklé, se zjistí až na poradě.</li>
+        </ul>
+      </div>
+      <div class="card tobe">
+        <h3>Jak to řeší aplikace (TO-BE)</h3>
+        <ul>
+          <li><strong>Jeden zdroj pravdy.</strong> Všechny akce, fáze, rozpočty a termíny jsou na jednom místě a vidí je všichni zapojení.</li>
+          <li><strong>Jasná pravidla brány.</strong> Každá fáze má kontrolní seznam povinných dokumentů a podmínek. Posun do další fáze je zakázaný, dokud nejsou splněné, a aplikace řekne, co chybí.</li>
+          <li><strong>Včasné odhalení.</strong> Dokumenty se hlídají v každé fázi, ne až na konci. Vrácení vyžaduje důvod, takže je vidět, proč se akce vrací.</li>
+          <li><strong>Úzká hrdla na očích.</strong> Limit dní u každé fáze, oranžový štítek při překročení, červený po termínu a přehled „kde to nejvíc vázne“.</li>
+          <li><strong>Auditní stopa.</strong> Kdo, kdy a co změnil, včetně zaškrtnutých dokumentů.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-diagram">
+    <h2 id="h-diagram">Fáze procesu (stage-gate)</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 980 210" role="img" aria-labelledby="svg-t svg-d">
+        <title id="svg-t">Diagram fází investiční akce</title>
+        <desc id="svg-d">Sedm fází od záměru po uzavření. Mezi fázemi jsou brány s kontrolním seznamem. Přerušovaná čára znázorňuje vrácení do předchozí fáze s důvodem.</desc>
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="svg-arrow"/></marker>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="svg-arrow-ret"/></marker>
+        </defs>
+        <g>
+          <rect class="svg-box" x="6" y="50" width="112" height="62" rx="10"/><text class="svg-t" x="62" y="77">Záměr</text><text class="svg-s" x="62" y="97">limit 21 dní</text>
+          <rect class="svg-box" x="148" y="50" width="112" height="62" rx="10"/><text class="svg-t" x="204" y="73">Schválení</text><text class="svg-t" x="204" y="88">investice</text><text class="svg-s" x="204" y="104">limit 30 dní</text>
+          <rect class="svg-box" x="290" y="50" width="112" height="62" rx="10"/><text class="svg-t" x="346" y="73">Projektová</text><text class="svg-t" x="346" y="88">příprava</text><text class="svg-s" x="346" y="104">limit 90 dní</text>
+          <rect class="svg-box" x="432" y="50" width="112" height="62" rx="10"/><text class="svg-t" x="488" y="73">Výběrové</text><text class="svg-t" x="488" y="88">řízení</text><text class="svg-s" x="488" y="104">limit 60 dní</text>
+          <rect class="svg-box" x="574" y="50" width="112" height="62" rx="10"/><text class="svg-t" x="630" y="77">Realizace</text><text class="svg-s" x="630" y="97">limit 180 dní</text>
+          <rect class="svg-box" x="716" y="50" width="112" height="62" rx="10"/><text class="svg-t" x="772" y="73">Předání a</text><text class="svg-t" x="772" y="88">kolaudace</text><text class="svg-s" x="772" y="104">limit 45 dní</text>
+          <rect class="svg-box end" x="858" y="50" width="112" height="62" rx="10"/><text class="svg-t" x="914" y="77">Uzavřeno</text><text class="svg-s" x="914" y="97">bez limitu</text>
+        </g>
+        <g>
+          <line class="svg-line" x1="118" y1="81" x2="148" y2="81" marker-end="url(#ar)"/>
+          <line class="svg-line" x1="260" y1="81" x2="290" y2="81" marker-end="url(#ar)"/>
+          <line class="svg-line" x1="402" y1="81" x2="432" y2="81" marker-end="url(#ar)"/>
+          <line class="svg-line" x1="544" y1="81" x2="574" y2="81" marker-end="url(#ar)"/>
+          <line class="svg-line" x1="686" y1="81" x2="716" y2="81" marker-end="url(#ar)"/>
+          <line class="svg-line" x1="828" y1="81" x2="858" y2="81" marker-end="url(#ar)"/>
+        </g>
+        <g>
+          <polygon class="svg-gate" points="133,69 141,81 133,93 125,81"/>
+          <polygon class="svg-gate" points="275,69 283,81 275,93 267,81"/>
+          <polygon class="svg-gate" points="417,69 425,81 417,93 409,81"/>
+          <polygon class="svg-gate" points="559,69 567,81 559,93 551,81"/>
+          <polygon class="svg-gate" points="701,69 709,81 701,93 693,81"/>
+          <polygon class="svg-gate" points="843,69 851,81 843,93 835,81"/>
+        </g>
+        <path class="svg-ret" d="M630,112 V160 H488 V118" marker-end="url(#arr)"/>
+        <text class="svg-r" x="559" y="178">vrácení s povinným důvodem</text>
+        <text class="svg-s" x="490" y="22">kosočtverec = brána s kontrolním seznamem dokumentů</text>
+      </svg>
+    </div>
+    <p class="note">Do další fáze se akce dostane až po splnění všech bodů brány. Limit dní říká, jak dlouho se akce ve fázi obvykle zdržuje. Po jeho překročení se zobrazí oranžový štítek.</p>
+  </section>
+
+  <section aria-labelledby="h-metriky">
+    <h2 id="h-metriky">Měřítka úspěchu</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Ukazatel</th><th scope="col">Co říká</th><th scope="col">Kde ho aplikace ukazuje</th><th scope="col">Cíl</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Průměrná doba ve fázi</strong></td><td>Kolik dní akce skutečně tráví v každé fázi, porovnáno s limitem.</td><td>Přehled, panel „Průměrná doba ve fázi a limit“</td><td class="n">≤ limit fáze</td></tr>
+          <tr><td><strong>Počet vrácení</strong></td><td>Kolikrát se akce vrátila do předchozí fáze. Vysoké číslo značí pozdě odhalené chybějící podklady.</td><td>Přehled, ukazatel „Vrácení celkem“, auditní stopa s důvody</td><td class="n">klesá</td></tr>
+          <tr><td><strong>Akce po termínu</strong></td><td>Kolik akcí překročilo termín dokončení.</td><td>Přehled, ukazatel „Po termínu“, červený štítek v seznamu</td><td class="n">0</td></tr>
+          <tr><td><strong>Akce nad limitem fáze</strong></td><td>Včasný signál úzkého hrdla ještě před zpožděním celé akce.</td><td>Přehled, „Kde to nejvíc vázne“, oranžový štítek</td><td class="n">klesá</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Všechny ukazatele se počítají z historie přesunů a termínů akcí, nikdo je nemusí ručně sestavovat do tabulky.</p>
+  </section>
+</main>
+<footer><div class="wrap">Ukázkový projekt s fiktivními daty. Autor: Tomáš Halama · <a href="index.html">Zpět do aplikace</a></div></footer>
+<script>
+(function () {
+  var KEY = "inv-theme", root = document.documentElement, btn = document.getElementById("theme-toggle");
+  try { var t = localStorage.getItem(KEY); if (t === "light" || t === "dark") root.setAttribute("data-theme", t); } catch (e) {}
+  function eff() { var t = root.getAttribute("data-theme"); return t || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); }
+  function label() { btn.textContent = eff() === "dark" ? "Světlý motiv" : "Tmavý motiv"; }
+  btn.addEventListener("click", function () {
+    var n = eff() === "dark" ? "light" : "dark"; root.setAttribute("data-theme", n);
+    try { localStorage.setItem(KEY, n); } catch (e) {} label();
+  });
+  label();
+})();
+</script>
+</body>
+</html>

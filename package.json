@@ -1,0 +1,12 @@
+{
+  "name": "investicni-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ukázkový tracker investičních akcí s Playwright testy",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1"
+  }
+}

@@ -1,0 +1,27 @@
+name: Testy
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Instalace závislostí
+        run: npm install
+      - name: Instalace prohlížeče Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Spuštění testů
+        run: npx playwright test --trace off
+      - name: Uložení zprávy při selhání
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/

@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tracker investičních akcí</title>
+<meta name="description" content="Ukázková aplikace pro sledování investičních akcí podle fází procesu (stage-gate), s kontrolními seznamy bran a auditní stopou.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f3f6f8; --surface: #ffffff; --surface-2: #e9eff3; --ink: #11232e; --muted: #52656f;
+  --line: #d3dde3; --accent: #0b5c7a; --accent-ink: #ffffff; --accent-soft: #dcecf3;
+  --ok: #1b7a4b; --ok-soft: #dff1e7; --warn: #964b00; --warn-soft: #fdebd3;
+  --bad: #b3261e; --bad-soft: #fbe1de; --shadow: 0 1px 2px rgba(17,35,46,.08), 0 4px 14px rgba(17,35,46,.06);
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-text: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Consolas", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1a22; --surface: #12262f; --surface-2: #193440; --ink: #e6eff3; --muted: #9db2bc;
+    --line: #28414d; --accent: #5cc0e6; --accent-ink: #06222d; --accent-soft: #17414f;
+    --ok: #5fd09a; --ok-soft: #12382a; --warn: #f0a54a; --warn-soft: #3d2a10;
+    --bad: #ff8a80; --bad-soft: #43201d; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1a22; --surface: #12262f; --surface-2: #193440; --ink: #e6eff3; --muted: #9db2bc;
+  --line: #28414d; --accent: #5cc0e6; --accent-ink: #06222d; --accent-soft: #17414f;
+  --ok: #5fd09a; --ok-soft: #12382a; --warn: #f0a54a; --warn-soft: #3d2a10;
+  --bad: #ff8a80; --bad-soft: #43201d; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1rem/1.5 var(--font-text); }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.2; margin: 0; }
+a { color: var(--accent); }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 1rem; }
+
+header.top { background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; padding-top: .9rem; padding-bottom: .9rem; }
+.brand { flex: 1 1 260px; min-width: 0; }
+.brand h1 { font-size: 1.55rem; font-weight: 700; letter-spacing: -.01em; }
+.brand p { margin: .1rem 0 0; color: var(--muted); font-size: .95rem; }
+.tools { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem .9rem; }
+.field-inline { display: flex; align-items: center; gap: .45rem; font-size: .9rem; color: var(--muted); }
+.field-inline select { max-width: 15rem; }
+
+button, select, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.btn { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .85rem; min-height: 2.5rem; font-weight: 600; color: var(--ink); }
+.btn:hover:not(:disabled) { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn.danger { color: var(--bad); }
+select, input[type="text"], input[type="search"], input[type="date"], textarea {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: .45rem .6rem; min-height: 2.5rem; max-width: 100%;
+}
+textarea { width: 100%; min-height: 4.5rem; resize: vertical; }
+[aria-invalid="true"] { border-color: var(--bad); }
+
+main.wrap { padding-top: 1.5rem; padding-bottom: 2.5rem; display: grid; gap: 1.5rem; }
+.section-title { font-size: 1.15rem; margin-bottom: .6rem; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: .75rem; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: .8rem 1rem; box-shadow: var(--shadow); }
+.kpi .label { font-family: var(--font-mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.kpi .value { font-family: var(--font-display); font-size: 1.7rem; font-weight: 700; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.kpi.warn .value { color: var(--warn); } .kpi.bad .value { color: var(--bad); }
+.kpi .value.small { font-size: 1.3rem; }
+.panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: .75rem; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; box-shadow: var(--shadow); min-width: 0; }
+.panel h3 { font-size: 1rem; margin-bottom: .7rem; }
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: .5rem; }
+.bar-row { display: grid; grid-template-columns: minmax(6.5rem, 11rem) 1fr auto; align-items: center; gap: .6rem; font-size: .92rem; }
+.bar-row .track { background: var(--surface-2); border-radius: 6px; height: .8rem; overflow: hidden; }
+.bar-row .fill { display: block; height: 100%; background: var(--accent); border-radius: 6px; }
+.bar-row .fill.over { background: var(--warn); }
+.bar-row .val { font-family: var(--font-mono); font-size: .85rem; font-variant-numeric: tabular-nums; min-width: 4.5rem; text-align: right; white-space: nowrap; }
+.callout { margin-top: .8rem; padding: .7rem .9rem; border-radius: 10px; background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+.callout.warn { background: var(--warn-soft); color: var(--warn); }
+.callout small { display: block; font-weight: 400; color: var(--ink); }
+
+.flow { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .8rem; padding: 0; list-style: none; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: .3rem .8rem; font-size: .92rem; font-weight: 600; min-height: 2.25rem; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip .n { font-family: var(--font-mono); font-size: .8rem; opacity: .85; margin-left: .25rem; }
+.controls { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: .8rem; }
+.controls .grow { flex: 1 1 14rem; min-width: 0; }
+.controls .grow input { width: 100%; }
+.controls .spacer { flex: 1 1 0; }
+
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+table { border-collapse: collapse; width: 100%; font-size: .94rem; }
+th, td { text-align: left; padding: .6rem .75rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); background: var(--surface-2); white-space: nowrap; }
+tbody tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; }
+td .nw { white-space: nowrap; }
+.name-btn { background: none; border: 0; padding: 0; text-align: left; font-weight: 700; color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.badge { display: inline-block; font-size: .78rem; font-weight: 700; padding: .12rem .55rem; border-radius: 999px; margin: 0 .3rem .25rem 0; line-height: 1.4; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.badge.info { background: var(--accent-soft); color: var(--accent); }
+.empty { padding: 1.5rem; text-align: center; color: var(--muted); }
+
+dialog { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--ink); padding: 0; width: min(46rem, calc(100vw - 1.5rem)); max-height: calc(100vh - 1.5rem); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+dialog::backdrop { background: rgba(8,20,28,.6); }
+.dlg { padding: 1.1rem 1.25rem 1.4rem; }
+.dlg-head { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; margin-bottom: .8rem; }
+.dlg-head h2 { font-size: 1.35rem; }
+.meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .5rem 1rem; margin: 0 0 1rem; }
+.meta div { min-width: 0; }
+.meta dt { font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.meta dd { margin: 0; font-weight: 600; }
+.stepper { list-style: none; margin: 0 0 1rem; padding: 0; display: flex; flex-wrap: wrap; gap: .35rem; }
+.stepper li { font-size: .82rem; padding: .2rem .6rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.stepper li.done { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.stepper li.current { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.dlg h3 { font-size: 1.05rem; margin: 1.1rem 0 .5rem; }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+.checks label { display: flex; gap: .6rem; align-items: flex-start; padding: .5rem .65rem; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.checks input { width: 1.2rem; height: 1.2rem; margin-top: .15rem; accent-color: var(--accent); flex: none; }
+.gate { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem 1rem; margin-top: .8rem; }
+.gate .hint { flex: 1 1 14rem; font-size: .92rem; color: var(--warn); font-weight: 600; }
+.gate .hint.ok { color: var(--ok); }
+.return-box { margin-top: 1rem; padding: .8rem; border: 1px dashed var(--line); border-radius: 10px; }
+.return-box label { font-weight: 600; font-size: .92rem; }
+.error { color: var(--bad); font-size: .88rem; font-weight: 600; margin: .25rem 0 0; min-height: 0; }
+.history { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; max-height: 16rem; overflow-y: auto; }
+.history li { padding: .45rem .65rem; background: var(--surface-2); border-radius: 8px; font-size: .92rem; }
+.history .when { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); display: block; }
+.form-grid { display: grid; gap: .9rem; }
+.form-grid label { font-weight: 600; display: block; margin-bottom: .2rem; }
+.form-grid input, .form-grid select { width: 100%; }
+.form-actions { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.1rem; flex-wrap: wrap; }
+
+.toast { position: fixed; left: 50%; bottom: 1rem; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: .6rem 1rem; border-radius: 10px; font-weight: 600; z-index: 50; max-width: calc(100vw - 2rem); box-shadow: var(--shadow); }
+.toast[hidden] { display: none; }
+footer { border-top: 1px solid var(--line); padding: 1rem 0 1.6rem; color: var(--muted); font-size: .9rem; }
+footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; }
+
+@media (max-width: 640px) {
+  .brand h1 { font-size: 1.3rem; }
+  .table-wrap { background: none; border: 0; box-shadow: none; overflow: visible; }
+  table, tbody, tr, td { display: block; width: 100%; }
+  thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  tr { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; margin-bottom: .7rem; padding: .35rem .2rem; box-shadow: var(--shadow); }
+  td { border: 0; display: flex; gap: .75rem; justify-content: space-between; padding: .3rem .75rem; text-align: right; }
+  td::before { content: attr(data-label); font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; color: var(--muted); text-align: left; flex: none; padding-top: .2rem; }
+  td.r { text-align: right; }
+  td .cell { min-width: 0; overflow-wrap: anywhere; }
+  .bar-row { grid-template-columns: minmax(5.5rem, 8rem) 1fr auto; font-size: .85rem; }
+  .tools { width: 100%; } .field-inline { width: 100%; } .field-inline select { flex: 1; min-width: 0; max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <h1 data-testid="app-title">Tracker investičních akcí</h1>
+      <p>Fáze, brány a úzká hrdla investiční výstavby na jednom místě. <a href="proces.html" data-testid="link-proces">Procesní analýza</a></p>
+    </div>
+    <div class="tools">
+      <label class="field-inline" for="user-select">Přihlášen jako
+        <select id="user-select" data-testid="user-select"></select>
+      </label>
+      <button class="btn" type="button" id="theme-toggle" data-testid="theme-toggle" aria-label="Přepnout světlý a tmavý motiv">Motiv</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section aria-labelledby="h-dash">
+    <h2 class="section-title" id="h-dash">Přehled</h2>
+    <div class="kpis" id="kpis"></div>
+    <div class="panels" style="margin-top:.75rem">
+      <div class="panel">
+        <h3>Akce podle fáze</h3>
+        <ul class="bars" id="bars-count"></ul>
+      </div>
+      <div class="panel">
+        <h3>Průměrná doba ve fázi a limit</h3>
+        <ul class="bars" id="bars-avg"></ul>
+        <div class="callout" id="bottleneck" data-testid="bottleneck"></div>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-list">
+    <h2 class="section-title" id="h-list">Seznam akcí</h2>
+    <ul class="flow" id="flow" aria-label="Filtr podle fáze"></ul>
+    <div class="controls">
+      <div class="grow"><label class="sr-only" for="search">Hledat v akcích</label>
+        <input type="search" id="search" data-testid="search" placeholder="Hledat podle ID, názvu nebo osoby" autocomplete="off"></div>
+      <label class="field-inline" for="sort">Řazení
+        <select id="sort" data-testid="sort">
+          <option value="id">Podle ID</option>
+          <option value="budget">Rozpočet (nejvyšší)</option>
+          <option value="days">Nejdéle ve fázi</option>
+          <option value="deadline">Termín (nejbližší)</option>
+        </select>
+      </label>
+      <span class="spacer"></span>
+      <button class="btn primary" type="button" id="btn-new" data-testid="btn-new">Nová akce</button>
+      <button class="btn" type="button" id="btn-export" data-testid="btn-export">Export CSV</button>
+      <button class="btn danger" type="button" id="btn-reset" data-testid="btn-reset">Obnovit ukázková data</button>
+    </div>
+    <div class="table-wrap">
+      <table data-testid="actions-table">
+        <thead><tr>
+          <th scope="col">ID</th><th scope="col">Název akce</th><th scope="col">Odpovědná osoba</th>
+          <th scope="col" class="r">Rozpočet</th><th scope="col">Fáze</th><th scope="col" class="r">Dnů ve fázi</th>
+          <th scope="col">Termín</th><th scope="col">Stav</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="empty" id="empty" data-testid="empty" hidden>Filtru neodpovídá žádná akce.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Ukázkový projekt s fiktivními daty. Autor: Tomáš Halama</span>
+    <a href="proces.html">Procesní analýza</a>
+  </div>
+</footer>
+
+<dialog id="detail" data-testid="detail" aria-labelledby="detail-title"></dialog>
+<dialog id="form-dlg" data-testid="form-dialog" aria-labelledby="form-title">
+  <form class="dlg" id="form" novalidate>
+    <div class="dlg-head"><h2 id="form-title">Nová investiční akce</h2>
+      <button class="btn" type="button" data-close aria-label="Zavřít">Zavřít</button></div>
+    <div class="form-grid">
+      <div><label for="f-name">Název akce</label>
+        <input type="text" id="f-name" data-testid="f-name" autocomplete="off" aria-describedby="err-name">
+        <p class="error" id="err-name" data-testid="err-name" role="alert"></p></div>
+      <div><label for="f-owner">Odpovědná osoba</label>
+        <select id="f-owner" data-testid="f-owner" aria-describedby="err-owner"></select>
+        <p class="error" id="err-owner" data-testid="err-owner" role="alert"></p></div>
+      <div><label for="f-budget">Rozpočet v Kč</label>
+        <input type="text" id="f-budget" data-testid="f-budget" inputmode="decimal" autocomplete="off" aria-describedby="err-budget">
+        <p class="error" id="err-budget" data-testid="err-budget" role="alert"></p></div>
+      <div><label for="f-deadline">Termín dokončení</label>
+        <input type="date" id="f-deadline" data-testid="f-deadline" aria-describedby="err-deadline">
+        <p class="error" id="err-deadline" data-testid="err-deadline" role="alert"></p></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="button" data-close data-testid="btn-cancel">Zrušit</button>
+      <button class="btn primary" type="submit" data-testid="btn-save">Založit akci</button>
+    </div>
+  </form>
+</dialog>
+<div class="toast" id="toast" data-testid="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  "use strict";
+  var STORE_KEY = "inv-tracker-v1";
+  var THEME_KEY = "inv-theme";
+  var MIN_NAME = 5;
+
+  var STAGES = [
+    { name: "Záměr", limit: 21, gate: ["Popis záměru a potřeby", "Určená odpovědná osoba", "Orientační odhad rozpočtu"] },
+    { name: "Schválení investice", limit: 30, gate: ["Investiční záměr", "Odhad nákladů", "Schválení investiční komisí"] },
+    { name: "Projektová příprava", limit: 90, gate: ["Projektová dokumentace", "Stavební povolení nebo ohlášení", "Rozpočet projektu", "Posouzení rizik"] },
+    { name: "Výběrové řízení", limit: 60, gate: ["Zadávací dokumentace", "Vyhodnocení nabídek", "Podepsaná smlouva o dílo (SoD)"] },
+    { name: "Realizace", limit: 180, gate: ["Zápisy z kontrolních dnů", "Odsouhlasené změny a vícepráce", "Dokončené dílo podle soupisu prací"] },
+    { name: "Předání a kolaudace", limit: 45, gate: ["Předávací protokol", "Dokumentace skutečného provedení", "Kolaudační souhlas", "Záruční listy"] },
+    { name: "Uzavřeno", limit: null, gate: [] }
+  ];
+  var LAST = STAGES.length - 1;
+
+  var USERS = [
+    { id: "u1", name: "Jana Svobodová", role: "Manažerka podpory procesů" },
+    { id: "u2", name: "Petr Novotný", role: "Projektový manažer" },
+    { id: "u3", name: "Marie Kratochvílová", role: "Technik investic" },
+    { id: "u4", name: "Lukáš Beneš", role: "Správce stavby" },
+    { id: "u5", name: "Eva Horáková", role: "Rozpočtářka" }
+  ];
+
+  /* ---------- datum ---------- */
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function today() {
+    var q = new URLSearchParams(location.search).get("dnes");
+    if (q && /^\d{4}-\d{2}-\d{2}$/.test(q)) return q;
+    if (typeof window.__TODAY__ === "string" && /^\d{4}-\d{2}-\d{2}$/.test(window.__TODAY__)) return window.__TODAY__;
+    var d = new Date(Date.now());
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+  function dayNum(iso) { var p = iso.split("-").map(Number); return Date.UTC(p[0], p[1] - 1, p[2]) / 864e5; }
+  function addDays(iso, n) {
+    var d = new Date((dayNum(iso) + n) * 864e5);
+    return d.getUTCFullYear() + "-" + pad(d.getUTCMonth() + 1) + "-" + pad(d.getUTCDate());
+  }
+  function diffDays(a, b) { return Math.round(dayNum(a) - dayNum(b)); }
+  function fmtDate(iso) { var p = iso.split("-"); return Number(p[2]) + ". " + Number(p[1]) + ". " + p[0]; }
+  function nowTime() { var d = new Date(Date.now()); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
+
+  /* ---------- formátování ---------- */
+  function fmtNum(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+  function fmtKc(n) { return fmtNum(n) + " Kč"; }
+  function plural(n, one, few, many) { return n === 1 ? one : (n >= 2 && n <= 4 ? few : many); }
+  function days(n) { return n + " " + plural(n, "den", "dny", "dní"); }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
+  }
+  function norm(s) { return String(s).normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+  function userName(id) { var u = USERS.find(function (x) { return x.id === id; }); return u ? u.name : id; }
+
+  /* ---------- ukázková data ---------- */
+  var SEED_DEFS = [
+    { n: 1, name: "Rekonstrukce odbavovacích stání skupiny B", owner: "u2", budget: 48500000, deadline: 90,
+      path: [[0, -300], [1, -285], [2, -260], [3, -185], [4, -120]], checked: [1, 1, 0] },
+    { n: 2, name: "Výměna eskalátorů v Terminálu 2", owner: "u3", budget: 27800000, deadline: 200,
+      path: [[0, -250], [1, -232], [2, -205], [3, -150], [2, -140], [3, -75]], checked: [1, 0, 0] },
+    { n: 3, name: "Nové LED osvětlení parkoviště P2", owner: "u5", budget: 3200000, deadline: 150,
+      path: [[0, -30], [1, -12]], checked: [1, 1, 0] },
+    { n: 4, name: "Modernizace třídírny zavazadel", owner: "u2", budget: 112000000, deadline: 400,
+      path: [[0, -150], [1, -130], [2, -104]], checked: [1, 1, 1, 0] },
+    { n: 5, name: "Oprava pojezdové dráhy F", owner: "u4", budget: 76400000, deadline: -5,
+      path: [[0, -240], [1, -222], [2, -195], [3, -125], [4, -60]], checked: [1, 0, 0] },
+    { n: 6, name: "Rozšíření bezpečnostní kontroly T1", owner: "u1", budget: 18900000, deadline: 300,
+      path: [[0, -8]], checked: [1, 0, 0] },
+    { n: 7, name: "Fotovoltaika na střeše hangáru", owner: "u3", budget: 9650000, deadline: 30,
+      path: [[0, -300], [1, -282], [2, -255], [3, -185], [4, -120], [5, -45]], checked: [1, 1, 1, 0] },
+    { n: 8, name: "Rekonstrukce sociálního zázemí T2", owner: "u5", budget: 6100000, deadline: -40,
+      path: [[0, -330], [1, -312], [2, -285], [3, -225], [4, -150], [5, -85], [6, -50]], checked: [] }
+  ];
+  var RETURN_REASON = "Vráceno k doplnění: rozpočet neodpovídá projektové dokumentaci.";
+
+  function buildSeed(t) {
+    var actions = SEED_DEFS.map(function (d) {
+      var stays = [], history = [];
+      d.path.forEach(function (p, i) {
+        var date = addDays(t, p[1]);
+        var next = d.path[i + 1];
+        stays.push({ stage: p[0], from: date, to: next ? addDays(t, next[1]) : null });
+        if (i === 0) {
+          history.push({ date: date, time: "08:00", user: d.owner, text: "Akce založena ve fázi „" + STAGES[p[0]].name + "“." });
+        } else if (p[0] < d.path[i - 1][0]) {
+          history.push({ date: date, time: "09:15", user: d.owner, text: "Vrácení z fáze „" + STAGES[d.path[i - 1][0]].name + "“ do fáze „" + STAGES[p[0]].name + "“. Důvod: " + RETURN_REASON });
+        } else {
+          history.push({ date: date, time: "09:15", user: d.owner, text: "Posun z fáze „" + STAGES[d.path[i - 1][0]].name + "“ do fáze „" + STAGES[p[0]].name + "“." });
+        }
+      });
+      var last = d.path[d.path.length - 1];
+      var gate = STAGES[last[0]].gate;
+      var checks = gate.map(function (_, i) { return !!d.checked[i]; });
+      checks.forEach(function (c, i) {
+        if (c) history.push({ date: addDays(t, last[1] + 1), time: "10:30", user: d.owner, text: "Splněno: " + gate[i] });
+      });
+      return {
+        id: "INV-2026-" + String(d.n).padStart(3, "0"), name: d.name, owner: d.owner, budget: d.budget,
+        stage: last[0], stageEntry: addDays(t, last[1]), deadline: addDays(t, d.deadline),
+        checks: checks, stays: stays, history: history
+      };
+    });
+    return { actions: actions, user: USERS[0].id };
+  }
+
+  /* ---------- stav ---------- */
+  var S, ui = { filter: "all", q: "", sort: "id", openId: null };
+
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) { /* úložiště nedostupné */ } }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      return data && Array.isArray(data.actions) ? data : null;
+    } catch (e) { return null; }
+  }
+  function mutate(id, fn) {
+    S = Object.assign({}, S, { actions: S.actions.map(function (a) {
+      if (a.id !== id) return a;
+      var c = JSON.parse(JSON.stringify(a)); fn(c); return c;
+    }) });
+    save();
+  }
+  function addHist(a, text) { a.history.push({ date: today(), time: nowTime(), user: S.user, text: text }); }
+
+  /* ---------- výpočty ---------- */
+  function info(a) {
+    var t = today();
+    var inStage = Math.max(0, diffDays(t, a.stageEntry));
+    var limit = STAGES[a.stage].limit;
+    var closed = a.stage === LAST;
+    var overLimit = !closed && limit != null && inStage > limit ? inStage - limit : 0;
+    var overDue = !closed && diffDays(t, a.deadline) > 0 ? diffDays(t, a.deadline) : 0;
+    return { inStage: inStage, limit: limit, closed: closed, overLimit: overLimit, overDue: overDue };
+  }
+  function missing(a) {
+    return STAGES[a.stage].gate.filter(function (_, i) { return !a.checks[i]; });
+  }
+  function stats() {
+    var t = today(), acts = S.actions;
+    var count = STAGES.map(function (_, i) { return acts.filter(function (a) { return a.stage === i; }).length; });
+    var avg = STAGES.map(function (_, i) {
+      var durs = [];
+      acts.forEach(function (a) { a.stays.forEach(function (s) {
+        if (s.stage === i) durs.push(Math.max(0, diffDays(s.to || t, s.from)));
+      }); });
+      return durs.length ? Math.round(durs.reduce(function (x, y) { return x + y; }, 0) / durs.length) : null;
+    });
+    var overByStage = STAGES.map(function () { return { n: 0, sum: 0 }; });
+    var overLimit = 0, overDue = 0, returns = 0, budget = 0;
+    acts.forEach(function (a) {
+      var i = info(a);
+      budget += a.budget;
+      if (i.overLimit) { overLimit++; overByStage[a.stage].n++; overByStage[a.stage].sum += i.overLimit; }
+      if (i.overDue) overDue++;
+      returns += a.history.filter(function (h) { return h.text.indexOf("Vrácení") === 0; }).length;
+    });
+    var worst = -1;
+    overByStage.forEach(function (o, i) { if (o.sum > 0 && (worst < 0 || o.sum > overByStage[worst].sum)) worst = i; });
+    return { count: count, avg: avg, overLimit: overLimit, overDue: overDue, returns: returns, budget: budget, over: overByStage, worst: worst, total: acts.length };
+  }
+
+  /* ---------- vykreslení ---------- */
+  var $ = function (id) { return document.getElementById(id); };
+
+  function renderDash() {
+    var st = stats();
+    $("kpis").innerHTML =
+      kpi("kpi-total", "Akcí celkem", String(st.total), "") +
+      kpi("kpi-overlimit", "Nad limitem fáze", String(st.overLimit), st.overLimit ? "warn" : "") +
+      kpi("kpi-overdue", "Po termínu", String(st.overDue), st.overDue ? "bad" : "") +
+      kpi("kpi-returns", "Vrácení celkem", String(st.returns), "") +
+      kpi("kpi-budget", "Celkový rozpočet", fmtKc(st.budget), "", true);
+    var max = Math.max.apply(null, st.count.concat([1]));
+    $("bars-count").innerHTML = STAGES.map(function (s, i) {
+      return '<li class="bar-row"><span>' + esc(s.name) + '</span><span class="track"><span class="fill" style="width:' + (st.count[i] / max * 100) + '%"></span></span>' +
+        '<span class="val" data-testid="dash-stage-' + i + '">' + st.count[i] + '</span></li>';
+    }).join("");
+    $("bars-avg").innerHTML = STAGES.slice(0, LAST).map(function (s, i) {
+      var a = st.avg[i];
+      var pct = a == null ? 0 : Math.min(100, a / s.limit * 100);
+      var over = a != null && a > s.limit;
+      return '<li class="bar-row"><span>' + esc(s.name) + '</span><span class="track"><span class="fill' + (over ? " over" : "") + '" style="width:' + pct + '%"></span></span>' +
+        '<span class="val" data-testid="avg-stage-' + i + '">' + (a == null ? "–" : a) + ' / ' + s.limit + '</span></li>';
+    }).join("");
+    var b = $("bottleneck");
+    if (st.worst < 0) {
+      b.className = "callout";
+      b.innerHTML = 'Kde to vázne: nikde<small>Žádná akce nepřekračuje limit své fáze.</small>';
+    } else {
+      var o = st.over[st.worst];
+      b.className = "callout warn";
+      b.innerHTML = 'Kde to nejvíc vázne: ' + esc(STAGES[st.worst].name) +
+        '<small>' + o.n + ' ' + plural(o.n, "akce", "akce", "akcí") + ' nad limitem, celkem ' + days(o.sum) + ' navíc.</small>';
+    }
+  }
+  function kpi(tid, label, value, cls, small) {
+    return '<div class="kpi ' + cls + '"><div class="label">' + label + '</div><div class="value' + (small ? " small" : "") + '" data-testid="' + tid + '">' + value + '</div></div>';
+  }
+
+  function visibleActions() {
+    var q = norm(ui.q.trim());
+    var list = S.actions.filter(function (a) {
+      if (ui.filter !== "all" && String(a.stage) !== ui.filter) return false;
+      if (!q) return true;
+      return norm(a.id + " " + a.name + " " + userName(a.owner)).indexOf(q) >= 0;
+    });
+    var cmp = {
+      id: function (a, b) { return a.id.localeCompare(b.id); },
+      budget: function (a, b) { return b.budget - a.budget; },
+      days: function (a, b) { return info(b).inStage - info(a).inStage; },
+      deadline: function (a, b) { return a.deadline.localeCompare(b.deadline); }
+    }[ui.sort];
+    return list.slice().sort(cmp);
+  }
+  function badges(a) {
+    var i = info(a), out = "";
+    if (i.closed) return '<span class="badge ok">Uzavřeno</span>';
+    if (i.overDue) out += '<span class="badge bad" data-testid="badge-overdue">Po termínu o ' + days(i.overDue) + '</span>';
+    if (i.overLimit) out += '<span class="badge warn" data-testid="badge-limit">Překročen limit fáze o ' + days(i.overLimit) + '</span>';
+    return out || '<span class="badge ok">V limitu</span>';
+  }
+
+  function renderList() {
+    $("flow").innerHTML = '<li><button class="chip" type="button" data-filter="all" data-testid="filter-all" aria-pressed="' + (ui.filter === "all") + '">Všechny<span class="n">' + S.actions.length + '</span></button></li>' +
+      STAGES.map(function (s, i) {
+        var n = S.actions.filter(function (a) { return a.stage === i; }).length;
+        return '<li><button class="chip" type="button" data-filter="' + i + '" data-testid="filter-stage-' + i + '" aria-pressed="' + (ui.filter === String(i)) + '">' + esc(s.name) + '<span class="n">' + n + '</span></button></li>';
+      }).join("");
+    var list = visibleActions();
+    $("rows").innerHTML = list.map(function (a) {
+      var i = info(a);
+      return '<tr data-testid="row-' + a.id + '">' +
+        '<td data-label="ID"><span class="cell mono nw">' + a.id + '</span></td>' +
+        '<td data-label="Název akce"><span class="cell"><button type="button" class="name-btn" data-open="' + a.id + '" data-testid="open-' + a.id + '">' + esc(a.name) + '</button></span></td>' +
+        '<td data-label="Odpovědná osoba"><span class="cell">' + esc(userName(a.owner)) + '</span></td>' +
+        '<td data-label="Rozpočet" class="r"><span class="cell num nw">' + fmtKc(a.budget) + '</span></td>' +
+        '<td data-label="Fáze"><span class="cell" data-testid="stage-' + a.id + '">' + esc(STAGES[a.stage].name) + '</span></td>' +
+        '<td data-label="Dnů ve fázi" class="r"><span class="cell num nw">' + i.inStage + (i.limit ? " / " + i.limit : "") + '</span></td>' +
+        '<td data-label="Termín"><span class="cell num nw">' + fmtDate(a.deadline) + '</span></td>' +
+        '<td data-label="Stav"><span class="cell">' + badges(a) + '</span></td></tr>';
+    }).join("");
+    $("empty").hidden = list.length > 0;
+  }
+
+  function renderDetail(focusSel) {
+    var a = S.actions.find(function (x) { return x.id === ui.openId; });
+    var dlg = $("detail");
+    if (!a) return;
+    var i = info(a), gate = STAGES[a.stage].gate, miss = missing(a);
+    var stepper = STAGES.map(function (s, k) {
+      return '<li class="' + (k < a.stage ? "done" : k === a.stage ? "current" : "") + '"' + (k === a.stage ? ' aria-current="step"' : "") + '>' + esc(s.name) + '</li>';
+    }).join("");
+    var checks = gate.length ? gate.map(function (g, k) {
+      return '<li><label><input type="checkbox" data-check="' + k + '" data-testid="check-' + k + '"' + (a.checks[k] ? " checked" : "") + '><span>' + esc(g) + '</span></label></li>';
+    }).join("") : '<li class="empty">Akce je uzavřena, brána se už nevyhodnocuje.</li>';
+    var hint, hintOk = false;
+    if (a.stage === LAST) { hint = "Akce je ve finální fázi."; hintOk = true; }
+    else if (miss.length) hint = "Chybí splnit: " + miss.join("; ") + ".";
+    else { hint = "Všechny podmínky brány jsou splněné, akci lze posunout."; hintOk = true; }
+    var hist = a.history.slice().reverse().map(function (h) {
+      return '<li data-testid="history-item"><span class="when">' + fmtDate(h.date) + " " + h.time + " · " + esc(userName(h.user)) + '</span>' + esc(h.text) + '</li>';
+    }).join("");
+    dlg.innerHTML = '<div class="dlg">' +
+      '<div class="dlg-head"><div><span class="mono" data-testid="detail-id">' + a.id + '</span><h2 id="detail-title">' + esc(a.name) + '</h2></div>' +
+      '<button class="btn" type="button" data-close data-testid="detail-close">Zavřít</button></div>' +
+      '<dl class="meta"><div><dt>Odpovědná osoba</dt><dd>' + esc(userName(a.owner)) + '</dd></div>' +
+      '<div><dt>Rozpočet</dt><dd class="num">' + fmtKc(a.budget) + '</dd></div>' +
+      '<div><dt>Ve fázi od</dt><dd class="num">' + fmtDate(a.stageEntry) + ' (' + days(i.inStage) + (i.limit ? ", limit " + i.limit : "") + ')</dd></div>' +
+      '<div><dt>Termín dokončení</dt><dd class="num">' + fmtDate(a.deadline) + '</dd></div>' +
+      '<div><dt>Stav</dt><dd>' + badges(a) + '</dd></div></dl>' +
+      '<ol class="stepper" aria-label="Fáze procesu">' + stepper + '</ol>' +
+      '<h3>Kontrolní seznam brány: ' + esc(STAGES[a.stage].name) + '</h3><ul class="checks">' + checks + '</ul>' +
+      '<div class="gate"><button class="btn primary" type="button" data-advance data-testid="btn-advance"' + (miss.length || a.stage === LAST ? " disabled" : "") + '>Posunout do další fáze</button>' +
+      '<span class="hint' + (hintOk ? " ok" : "") + '" data-testid="gate-hint" aria-live="polite">' + esc(hint) + '</span></div>' +
+      '<div class="return-box"><label for="return-reason">Důvod vrácení do předchozí fáze</label>' +
+      '<textarea id="return-reason" data-testid="return-reason" aria-describedby="return-error"' + (a.stage === 0 ? " disabled" : "") + '></textarea>' +
+      '<p class="error" id="return-error" data-testid="return-error" role="alert"></p>' +
+      '<button class="btn" type="button" data-return data-testid="btn-return"' + (a.stage === 0 ? " disabled" : "") + '>Vrátit do předchozí fáze</button></div>' +
+      '<h3>Auditní stopa</h3><ol class="history" data-testid="history">' + hist + '</ol></div>';
+    if (focusSel) { var el = dlg.querySelector(focusSel); if (el) el.focus(); }
+  }
+
+  function render() { renderDash(); renderList(); if (ui.openId && $("detail").open) renderDetail(); }
+
+  function toast(msg) {
+    var t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, 3500);
+  }
+
+  /* ---------- akce ---------- */
+  function openDetail(id) {
+    ui.openId = id; renderDetail();
+    var d = $("detail"); if (!d.open) d.showModal();
+  }
+  function advance() {
+    var a = S.actions.find(function (x) { return x.id === ui.openId; });
+    if (!a || a.stage === LAST || missing(a).length) return;
+    var from = a.stage, to = from + 1;
+    mutate(a.id, function (c) {
+      c.stays[c.stays.length - 1].to = today();
+      c.stays.push({ stage: to, from: today(), to: null });
+      c.stage = to; c.stageEntry = today(); c.checks = STAGES[to].gate.map(function () { return false; });
+      addHist(c, "Posun z fáze „" + STAGES[from].name + "“ do fáze „" + STAGES[to].name + "“.");
+    });
+    render(); renderDetail('[data-testid="btn-return"]');
+    toast("Akce byla posunuta do fáze „" + STAGES[to].name + "“.");
+  }
+  function doReturn() {
+    var a = S.actions.find(function (x) { return x.id === ui.openId; });
+    var box = $("return-reason"), err = $("return-error");
+    var reason = box.value.trim();
+    if (!reason) {
+      err.textContent = "Uveďte důvod vrácení, bez něj akci vrátit nelze.";
+      box.setAttribute("aria-invalid", "true"); box.focus(); return;
+    }
+    var from = a.stage, to = from - 1;
+    mutate(a.id, function (c) {
+      c.stays[c.stays.length - 1].to = today();
+      c.stays.push({ stage: to, from: today(), to: null });
+      c.stage = to; c.stageEntry = today(); c.checks = STAGES[to].gate.map(function () { return false; });
+      addHist(c, "Vrácení z fáze „" + STAGES[from].name + "“ do fáze „" + STAGES[to].name + "“. Důvod: " + reason);
+    });
+    render(); renderDetail('[data-testid="btn-advance"]');
+    toast("Akce byla vrácena do fáze „" + STAGES[to].name + "“.");
+  }
+  function toggleCheck(k, checked) {
+    var id = ui.openId, label = null;
+    mutate(id, function (c) {
+      c.checks[k] = checked; label = STAGES[c.stage].gate[k];
+      addHist(c, (checked ? "Splněno: " : "Zrušeno zaškrtnutí: ") + label);
+    });
+    render(); renderDetail('[data-check="' + k + '"]');
+  }
+
+  /* ---------- formulář ---------- */
+  function setErr(field, msg) {
+    $("err-" + field).textContent = msg;
+    var el = $("f-" + field);
+    if (msg) el.setAttribute("aria-invalid", "true"); else el.removeAttribute("aria-invalid");
+  }
+  function parseBudget(v) {
+    var s = String(v).replace(/[\s ]/g, "").replace(",", ".");
+    return s === "" || !/^-?\d+(\.\d+)?$/.test(s) ? NaN : Number(s);
+  }
+  function validate() {
+    var name = $("f-name").value.trim(), owner = $("f-owner").value, deadline = $("f-deadline").value;
+    var rawBudget = $("f-budget").value, budget = parseBudget(rawBudget);
+    var errs = {};
+    if (!name) errs.name = "Zadejte název akce.";
+    else if (name.length < MIN_NAME) errs.name = "Název musí mít alespoň " + MIN_NAME + " znaků.";
+    if (!owner) errs.owner = "Vyberte odpovědnou osobu.";
+    if (!rawBudget.trim()) errs.budget = "Zadejte rozpočet v Kč.";
+    else if (!(budget > 0)) errs.budget = "Rozpočet musí být kladné číslo.";
+    if (!deadline) errs.deadline = "Zadejte termín dokončení.";
+    else if (deadline < today()) errs.deadline = "Termín nesmí být v minulosti.";
+    ["name", "owner", "budget", "deadline"].forEach(function (f) { setErr(f, errs[f] || ""); });
+    return Object.keys(errs).length ? null : { name: name, owner: owner, budget: budget, deadline: deadline };
+  }
+  function openForm() {
+    $("form").reset();
+    $("f-owner").innerHTML = '<option value="">Vyberte…</option>' + USERS.map(function (u) { return '<option value="' + u.id + '">' + esc(u.name) + '</option>'; }).join("");
+    ["name", "owner", "budget", "deadline"].forEach(function (f) { setErr(f, ""); });
+    $("form-dlg").showModal(); $("f-name").focus();
+  }
+  function submitForm(e) {
+    e.preventDefault();
+    var v = validate();
+    if (!v) { var first = document.querySelector('#form [aria-invalid="true"]'); if (first) first.focus(); return; }
+    var nextN = S.actions.reduce(function (m, a) { return Math.max(m, parseInt(a.id.slice(-3), 10) || 0); }, 0) + 1;
+    var id = "INV-2026-" + String(nextN).padStart(3, "0");
+    var a = { id: id, name: v.name, owner: v.owner, budget: v.budget, stage: 0, stageEntry: today(), deadline: v.deadline,
+      checks: STAGES[0].gate.map(function () { return false; }), stays: [{ stage: 0, from: today(), to: null }],
+      history: [{ date: today(), time: nowTime(), user: S.user, text: "Akce založena ve fázi „" + STAGES[0].name + "“." }] };
+    S = Object.assign({}, S, { actions: S.actions.concat([a]) }); save();
+    ui.filter = "all"; ui.q = ""; $("search").value = "";
+    $("form-dlg").close(); render(); toast("Akce " + id + " byla založena.");
+  }
+
+  /* ---------- export CSV ---------- */
+  function csvCell(v) { var s = String(v); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function buildCsv(list) {
+    var head = ["ID", "Název akce", "Odpovědná osoba", "Rozpočet (Kč)", "Fáze", "Datum vstupu do fáze", "Termín dokončení", "Dnů ve fázi", "Limit fáze (dny)", "Stav"];
+    var rows = list.map(function (a) {
+      var i = info(a), stav = i.closed ? "Uzavřeno" : [i.overDue ? "Po termínu o " + i.overDue + " dní" : "", i.overLimit ? "Překročen limit fáze o " + i.overLimit + " dní" : ""].filter(Boolean).join(", ") || "V limitu";
+      return [a.id, a.name, userName(a.owner), a.budget, STAGES[a.stage].name, fmtDate(a.stageEntry), fmtDate(a.deadline), i.inStage, i.limit == null ? "" : i.limit, stav];
+    });
+    return "﻿" + [head].concat(rows).map(function (r) { return r.map(csvCell).join(";"); }).join("\r\n") + "\r\n";
+  }
+  function exportCsv() {
+    var blob = new Blob([buildCsv(visibleActions())], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = "investicni-akce-" + today() + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    toast("Seznam akcí byl exportován do CSV.");
+  }
+
+  /* ---------- motiv ---------- */
+  function effectiveTheme() {
+    var t = document.documentElement.getAttribute("data-theme");
+    if (t) return t;
+    return window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function updateThemeBtn() { var d = effectiveTheme() === "dark"; $("theme-toggle").textContent = d ? "Světlý motiv" : "Tmavý motiv"; }
+  function toggleTheme() {
+    var next = effectiveTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* nic */ }
+    updateThemeBtn();
+  }
+
+  /* ---------- start ---------- */
+  function init() {
+    try { var th = localStorage.getItem(THEME_KEY); if (th === "light" || th === "dark") document.documentElement.setAttribute("data-theme", th); } catch (e) { /* nic */ }
+    updateThemeBtn();
+    S = load() || buildSeed(today());
+    if (!USERS.some(function (u) { return u.id === S.user; })) S.user = USERS[0].id;
+    save();
+    $("user-select").innerHTML = USERS.map(function (u) { return '<option value="' + u.id + '">' + esc(u.name) + ' – ' + esc(u.role) + '</option>'; }).join("");
+    $("user-select").value = S.user;
+
+    $("user-select").addEventListener("change", function (e) { S = Object.assign({}, S, { user: e.target.value }); save(); });
+    $("theme-toggle").addEventListener("click", toggleTheme);
+    $("search").addEventListener("input", function (e) { ui.q = e.target.value; renderList(); });
+    $("sort").addEventListener("change", function (e) { ui.sort = e.target.value; renderList(); });
+    $("flow").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-filter]"); if (!b) return;
+      ui.filter = b.getAttribute("data-filter"); renderList();
+      var again = document.querySelector('[data-filter="' + ui.filter + '"]'); if (again) again.focus();
+    });
+    $("rows").addEventListener("click", function (e) { var b = e.target.closest("[data-open]"); if (b) openDetail(b.getAttribute("data-open")); });
+    $("btn-new").addEventListener("click", openForm);
+    $("btn-export").addEventListener("click", exportCsv);
+    $("btn-reset").addEventListener("click", function () {
+      if (!window.confirm("Obnovit ukázková data? Všechny vaše změny budou přepsány.")) return;
+      var user = S.user;
+      S = buildSeed(today()); S.user = user; save();
+      ui = { filter: "all", q: "", sort: "id", openId: null }; $("search").value = ""; $("sort").value = "id";
+      render(); toast("Ukázková data byla obnovena.");
+    });
+    $("form").addEventListener("submit", submitForm);
+    document.addEventListener("click", function (e) {
+      var c = e.target.closest("[data-close]"); if (c) { var d = c.closest("dialog"); if (d) d.close(); }
+    });
+    $("detail").addEventListener("click", function (e) {
+      if (e.target === $("detail")) { $("detail").close(); return; }
+      if (e.target.closest("[data-advance]")) advance();
+      else if (e.target.closest("[data-return]")) doReturn();
+    });
+    $("detail").addEventListener("change", function (e) {
+      var c = e.target.closest("[data-check]"); if (c) toggleCheck(Number(c.getAttribute("data-check")), c.checked);
+    });
+    $("detail").addEventListener("input", function (e) {
+      if (e.target.id === "return-reason") { $("return-error").textContent = ""; e.target.removeAttribute("aria-invalid"); }
+    });
+    $("detail").addEventListener("close", function () { ui.openId = null; });
+    render();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
