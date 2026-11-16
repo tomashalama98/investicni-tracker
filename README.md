@@ -74,8 +74,9 @@ Testy běží proti `docs/index.html` přes `file://` s pevným datem „dnes“
 | TC-22 | negativní | Zrušení potvrzení obnovení | Data i filtr zůstanou |
 | TC-23 | pozitivní | Odkaz na procesní analýzu a zpět | Obě stránky se zobrazí |
 | TC-24 | pozitivní | Přepínač motivu | Motiv se přepne a zapamatuje |
+| TC-25 | pozitivní | Vrácení do předchozí fáze po posunu | Dříve splněné dokumenty zůstanou zaškrtnuté, posun je znovu povolen |
 
-TC-07 (3 hodnoty) a TC-12 (3 hodnoty) jsou parametrizované, celkem tedy 28 běhů.
+TC-07 (3 hodnoty) a TC-12 (3 hodnoty) jsou parametrizované, celkem tedy 29 běhů.
 
 ## Struktura
 

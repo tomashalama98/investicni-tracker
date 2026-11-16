@@ -10,7 +10,7 @@ test.describe('Kontrolní seznam brány', () => {
 
     // Act + Assert
     await expect(page.getByTestId('btn-advance')).toBeDisabled();
-    await expect(page.getByTestId('gate-hint')).toContainText('Chybí splnit: Schválení investiční komisí');
+    await expect(page.getByTestId('gate-hint')).toContainText('Zbývá splnit: Schválení investiční komisí');
   });
 
   test('TC-02 posun je povolen po zaškrtnutí posledního dokumentu a zapíše se do historie (pozitivní)', async ({ page }) => {
@@ -376,5 +376,25 @@ test.describe('Navigace a motiv', () => {
     expect(await motiv()).not.toBe(prvni);
     await otevri(page);
     expect(await motiv()).not.toBe(prvni);
+  });
+});
+
+test.describe('Zachování práce při vrácení', () => {
+  test('TC-25 po vrácení do předchozí fáze zůstanou dříve splněné dokumenty zaškrtnuté (pozitivní)', async ({ page }) => {
+    // Arrange: INV-2026-003 dokončí bránu Schválení a posune se dál
+    await otevri(page);
+    await detail(page, 'INV-2026-003');
+    await page.getByTestId('check-2').check();
+    await page.getByTestId('btn-advance').click();
+    await expect(page.getByTestId('stage-INV-2026-003')).toHaveText('Projektová příprava');
+
+    // Act
+    await page.getByTestId('return-reason').fill('Doplnit odhad nákladů');
+    await page.getByTestId('btn-return').click();
+
+    // Assert
+    await expect(page.getByTestId('stage-INV-2026-003')).toHaveText('Schválení investice');
+    for (const k of [0, 1, 2]) await expect(page.getByTestId(`check-${k}`)).toBeChecked();
+    await expect(page.getByTestId('btn-advance')).toBeEnabled();
   });
 });

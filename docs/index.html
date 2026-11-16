@@ -311,7 +311,11 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
   function nowTime() { var d = new Date(Date.now()); return pad(d.getHours()) + ":" + pad(d.getMinutes()); }
 
   /* ---------- formátování ---------- */
-  function fmtNum(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+  function fmtNum(n) {
+    var x = Math.round(n * 100) / 100, abs = Math.abs(x), whole = Math.floor(abs), cents = Math.round((abs - whole) * 100);
+    var out = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+    return (x < 0 ? "-" : "") + out + (cents ? "," + String(cents).padStart(2, "0") : "");
+  }
   function fmtKc(n) { return fmtNum(n) + " Kč"; }
   function plural(n, one, few, many) { return n === 1 ? one : (n >= 2 && n <= 4 ? few : many); }
   function days(n) { return n + " " + plural(n, "den", "dny", "dní"); }
@@ -352,7 +356,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
         if (i === 0) {
           history.push({ date: date, time: "08:00", user: d.owner, text: "Akce založena ve fázi „" + STAGES[p[0]].name + "“." });
         } else if (p[0] < d.path[i - 1][0]) {
-          history.push({ date: date, time: "09:15", user: d.owner, text: "Vrácení z fáze „" + STAGES[d.path[i - 1][0]].name + "“ do fáze „" + STAGES[p[0]].name + "“. Důvod: " + RETURN_REASON });
+          history.push({ date: date, time: "09:15", user: d.owner, kind: "return", text: "Vrácení z fáze „" + STAGES[d.path[i - 1][0]].name + "“ do fáze „" + STAGES[p[0]].name + "“. Důvod: " + RETURN_REASON });
         } else {
           history.push({ date: date, time: "09:15", user: d.owner, text: "Posun z fáze „" + STAGES[d.path[i - 1][0]].name + "“ do fáze „" + STAGES[p[0]].name + "“." });
         }
@@ -391,7 +395,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     }) });
     save();
   }
-  function addHist(a, text) { a.history.push({ date: today(), time: nowTime(), user: S.user, text: text }); }
+  function addHist(a, text, kind) { a.history.push({ date: today(), time: nowTime(), user: S.user, text: text, kind: kind || "info" }); }
 
   /* ---------- výpočty ---------- */
   function info(a) {
@@ -423,7 +427,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
       budget += a.budget;
       if (i.overLimit) { overLimit++; overByStage[a.stage].n++; overByStage[a.stage].sum += i.overLimit; }
       if (i.overDue) overDue++;
-      returns += a.history.filter(function (h) { return h.text.indexOf("Vrácení") === 0; }).length;
+      returns += a.history.filter(function (h) { return h.kind === "return"; }).length;
     });
     var worst = -1;
     overByStage.forEach(function (o, i) { if (o.sum > 0 && (worst < 0 || o.sum > overByStage[worst].sum)) worst = i; });
@@ -526,7 +530,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     }).join("") : '<li class="empty">Akce je uzavřena, brána se už nevyhodnocuje.</li>';
     var hint, hintOk = false;
     if (a.stage === LAST) { hint = "Akce je ve finální fázi."; hintOk = true; }
-    else if (miss.length) hint = "Chybí splnit: " + miss.join("; ") + ".";
+    else if (miss.length) hint = "Zbývá splnit: " + miss.join("; ") + ".";
     else { hint = "Všechny podmínky brány jsou splněné, akci lze posunout."; hintOk = true; }
     var hist = a.history.slice().reverse().map(function (h) {
       return '<li data-testid="history-item"><span class="when">' + fmtDate(h.date) + " " + h.time + " · " + esc(userName(h.user)) + '</span>' + esc(h.text) + '</li>';
@@ -570,7 +574,7 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     mutate(a.id, function (c) {
       c.stays[c.stays.length - 1].to = today();
       c.stays.push({ stage: to, from: today(), to: null });
-      c.stage = to; c.stageEntry = today(); c.checks = STAGES[to].gate.map(function () { return false; });
+      c.done = Object.assign({}, c.done || {}); c.done[from] = c.checks.slice(); c.stage = to; c.stageEntry = today(); c.checks = (c.done[to] || STAGES[to].gate.map(function () { return false; })).slice();
       addHist(c, "Posun z fáze „" + STAGES[from].name + "“ do fáze „" + STAGES[to].name + "“.");
     });
     render(); renderDetail('[data-testid="btn-return"]');
@@ -588,8 +592,8 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
     mutate(a.id, function (c) {
       c.stays[c.stays.length - 1].to = today();
       c.stays.push({ stage: to, from: today(), to: null });
-      c.stage = to; c.stageEntry = today(); c.checks = STAGES[to].gate.map(function () { return false; });
-      addHist(c, "Vrácení z fáze „" + STAGES[from].name + "“ do fáze „" + STAGES[to].name + "“. Důvod: " + reason);
+      c.done = Object.assign({}, c.done || {}); c.done[from] = c.checks.slice(); c.stage = to; c.stageEntry = today(); c.checks = (c.done[to] || STAGES[to].gate.map(function () { return false; })).slice();
+      addHist(c, "Vrácení z fáze „" + STAGES[from].name + "“ do fáze „" + STAGES[to].name + "“. Důvod: " + reason, "return");
     });
     render(); renderDetail('[data-testid="btn-advance"]');
     toast("Akce byla vrácena do fáze „" + STAGES[to].name + "“.");
@@ -649,11 +653,12 @@ footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; g
 
   /* ---------- export CSV ---------- */
   function csvCell(v) { var s = String(v); return /[;"\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function csvDate(iso) { return fmtDate(iso).replace(/ /g, ""); }
   function buildCsv(list) {
     var head = ["ID", "Název akce", "Odpovědná osoba", "Rozpočet (Kč)", "Fáze", "Datum vstupu do fáze", "Termín dokončení", "Dnů ve fázi", "Limit fáze (dny)", "Stav"];
     var rows = list.map(function (a) {
       var i = info(a), stav = i.closed ? "Uzavřeno" : [i.overDue ? "Po termínu o " + i.overDue + " dní" : "", i.overLimit ? "Překročen limit fáze o " + i.overLimit + " dní" : ""].filter(Boolean).join(", ") || "V limitu";
-      return [a.id, a.name, userName(a.owner), a.budget, STAGES[a.stage].name, fmtDate(a.stageEntry), fmtDate(a.deadline), i.inStage, i.limit == null ? "" : i.limit, stav];
+      return [a.id, a.name, userName(a.owner), String(a.budget).replace(".", ","), STAGES[a.stage].name, csvDate(a.stageEntry), csvDate(a.deadline), i.inStage, i.limit == null ? "" : i.limit, stav];
     });
     return "﻿" + [head].concat(rows).map(function (r) { return r.map(csvCell).join(";"); }).join("\r\n") + "\r\n";
   }
