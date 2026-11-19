@@ -1,5 +1,9 @@
 # Tracker investičních akcí
 
+[![Testy](https://github.com/tomashalama98/investicni-tracker/actions/workflows/tests.yml/badge.svg)](https://github.com/tomashalama98/investicni-tracker/actions/workflows/tests.yml)
+
+**Vyzkoušet:** https://tomashalama98.github.io/investicni-tracker/
+
 Ukázková webová aplikace pro sledování investičních akcí (například na letišti) podle fází procesu. Je to nezávislý ukázkový projekt s fiktivními daty, ne oficiální nástroj žádné organizace.
 
 ![Přehled aplikace](snimky/index-desktop-svetly.png)
